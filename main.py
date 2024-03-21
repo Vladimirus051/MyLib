@@ -2,7 +2,7 @@
 import flet as ft
 import sqlite3
 
-# Establishing a connection to the database
+# establishing a connection to the database
 conn = sqlite3.connect('database.db — копия')
 c = conn.cursor()
 
