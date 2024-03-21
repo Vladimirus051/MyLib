@@ -1,13 +1,15 @@
+# import libraries
 import flet as ft
 import sqlite3
 
+# Establishing a connection to the database
 conn = sqlite3.connect('database.db — копия')
 c = conn.cursor()
 
-
+# main function
 def main(page: ft.page):
     page.theme_mode = ft.ThemeMode.DARK
-
+    # create text fields for entering information
     txt_name_book = ft.TextField(label="название книги", width=300)
     txt_name_author = ft.TextField(label="автор", width=300)
     txt_name_genre = ft.TextField(label="жанр", width=300)
@@ -15,6 +17,7 @@ def main(page: ft.page):
     txt_status = ft.TextField(label="статус", width=300)
 
     def button_clicked(e):
+        # getting values from text fields
         name_book = txt_name_book.value
         author_book = txt_name_author.value
         genre_book = txt_name_genre.value
@@ -35,12 +38,13 @@ def main(page: ft.page):
         else:
             output_text.value = "заполни все поля"
 
+    # function for adding a book
     def add_book(e):
         button_clicked(e)
-
+    # create a text field to display information about adding a book
     output_text = ft.Text()
 
-
+    # create a button to add a book
     submit_btn = ft.ElevatedButton(text="добавить", on_click=add_book)
 
     def get_books():
@@ -50,6 +54,7 @@ def main(page: ft.page):
         c.execute("select * from books")
         return c.fetchall()
 
+    # function for filling the table with book data
     def fill_table(data):
         table = ft.DataTable(
             columns=[
@@ -78,16 +83,19 @@ def main(page: ft.page):
 
         return table
 
+    # function for browsing books
     def view_books(e):
         if isinstance(page.controls[-1], ft.DataTable):
             page.controls.pop()
 
         data = get_books()
         table = fill_table(data)
+        # display books as a scrolling list
         page.scroll = ft.ScrollMode.AUTO
         page.controls.append(table)
         page.update()
 
+    # function for deleting a book
     def delete_book(e):
         index = e.control.data
         conn = sqlite3.connect('database.db')
@@ -98,6 +106,7 @@ def main(page: ft.page):
 
     view_books_btn = ft.ElevatedButton(text="покажи книги", on_click=view_books)
 
+    # add all elements to the page
     page.add(txt_name_book,
              txt_name_author,
              txt_name_genre,
@@ -107,6 +116,7 @@ def main(page: ft.page):
              submit_btn,
              view_books_btn)
 
-
+# run the application with the main function as the target
 ft.app(target=main)
+# below is a web-based version of the app
 # ft.app(target=main, view=ft.AppView.WEB_BROWSER)
