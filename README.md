@@ -5,6 +5,7 @@ Application features:
 - marking books as read or unread
 - book rating
 - view and delete added books
+
 You can use the command to **quickly install** all required dependencies:
 
 `pip install requirements.txt`
