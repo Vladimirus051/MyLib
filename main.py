@@ -1,122 +1,176 @@
-# import libraries
-import flet as ft
+import sys
+import os
+from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
+                             QLabel, QLineEdit, QPushButton, QMessageBox,
+                             QTableWidget, QTableWidgetItem, QFileDialog,
+                             QHeaderView)
+from PyQt5.QtGui import QPixmap, QImage
+from PyQt5.QtCore import Qt
 import sqlite3
+import subprocess
 
-# establishing a connection to the database
-conn = sqlite3.connect('database.db — копия')
-c = conn.cursor()
 
-# main function
-def main(page: ft.page):
-    page.theme_mode = ft.ThemeMode.DARK
-    # create text fields for entering information
-    txt_name_book = ft.TextField(label="название книги", width=300)
-    txt_name_author = ft.TextField(label="автор", width=300)
-    txt_name_genre = ft.TextField(label="жанр", width=300)
-    txt_rating = ft.TextField(label="рейтинг", width=300)
-    txt_status = ft.TextField(label="статус", width=300)
+class BookApp(QWidget):
+    def __init__(self):
+        super().__init__()
 
-    def button_clicked(e):
-        # getting values from text fields
-        name_book = txt_name_book.value
-        author_book = txt_name_author.value
-        genre_book = txt_name_genre.value
-        rating_book = txt_rating.value
-        status_book = txt_status.value
+        self.initUI()
+        self.loadBooks()
 
-        if name_book and author_book and genre_book and rating_book and status_book:
-            conn = sqlite3.connect('database.db')
-            c = conn.cursor()
+    def initUI(self):
+        self.setWindowTitle('Library App')
+        self.setGeometry(100, 100, 1000, 700)
 
-            c.execute(
-                "insert into books (name, author, genre, rating, status) values (?,?,?,?,?)",
-                (name_book, author_book, genre_book, rating_book, status_book)
-            )
+        layout = QVBoxLayout()
 
-            conn.commit()
-            output_text.value = "книга добавлена"
-        else:
-            output_text.value = "заполни все поля"
+        form_layout = QVBoxLayout()
 
-    # function for adding a book
-    def add_book(e):
-        button_clicked(e)
-    # create a text field to display information about adding a book
-    output_text = ft.Text()
+        self.name_input = QLineEdit(self)
+        self.name_input.setPlaceholderText('Название книги')
+        form_layout.addWidget(QLabel('Название книги:'))
+        form_layout.addWidget(self.name_input)
 
-    # create a button to add a book
-    submit_btn = ft.ElevatedButton(text="добавить", on_click=add_book)
+        self.author_input = QLineEdit(self)
+        self.author_input.setPlaceholderText('Автор')
+        form_layout.addWidget(QLabel('Автор:'))
+        form_layout.addWidget(self.author_input)
 
-    def get_books():
-        conn = sqlite3.connect('database.db')
-        c = conn.cursor()
+        self.genre_input = QLineEdit(self)
+        self.genre_input.setPlaceholderText('Жанр')
+        form_layout.addWidget(QLabel('Жанр:'))
+        form_layout.addWidget(self.genre_input)
 
-        c.execute("select * from books")
-        return c.fetchall()
+        self.rating_input = QLineEdit(self)
+        self.rating_input.setPlaceholderText('Рейтинг')
+        form_layout.addWidget(QLabel('Рейтинг:'))
+        form_layout.addWidget(self.rating_input)
 
-    # function for filling the table with book data
-    def fill_table(data):
-        table = ft.DataTable(
-            columns=[
-                ft.DataColumn(ft.Text("№")),
-                ft.DataColumn(ft.Text("название")),
-                ft.DataColumn(ft.Text("автор")),
-                ft.DataColumn(ft.Text("жанр")),
-                ft.DataColumn(ft.Text("рейтинг")),
-                ft.DataColumn(ft.Text("статус")),
-                ft.DataColumn(ft.IconButton(icon=ft.icons.DELETE, on_click=delete_book))
-            ]
-        )
+        self.status_input = QLineEdit(self)
+        self.status_input.setPlaceholderText('Статус')
+        form_layout.addWidget(QLabel('Статус:'))
+        form_layout.addWidget(self.status_input)
 
-        for row in data:
-            table.rows.append(ft.DataRow(
-                cells=[
-                    ft.DataCell(ft.Text(row[0])),
-                    ft.DataCell(ft.Text(row[1])),
-                    ft.DataCell(ft.Text(row[2])),
-                    ft.DataCell(ft.Text(row[3])),
-                    ft.DataCell(ft.Text(row[4])),
-                    ft.DataCell(ft.Text(row[5])),
-                    ft.DataCell(ft.IconButton(icon=ft.icons.DELETE, on_click=delete_book, data=row[0]))
-                ]
-            ))
+        self.pdf_path_input = QLineEdit(self)
+        self.pdf_path_input.setPlaceholderText('Путь к PDF')
+        self.pdf_path_input.setReadOnly(True)
+        form_layout.addWidget(QLabel('PDF файл:'))
+        form_layout.addWidget(self.pdf_path_input)
 
-        return table
+        self.upload_pdf_btn = QPushButton('Загрузить PDF', self)
+        self.upload_pdf_btn.clicked.connect(self.uploadPDF)
+        form_layout.addWidget(self.upload_pdf_btn)
 
-    # function for browsing books
-    def view_books(e):
-        if isinstance(page.controls[-1], ft.DataTable):
-            page.controls.pop()
+        self.submit_btn = QPushButton('Добавить книгу', self)
+        self.submit_btn.clicked.connect(self.addBook)
+        form_layout.addWidget(self.submit_btn)
 
-        data = get_books()
-        table = fill_table(data)
-        # display books as a scrolling list
-        page.scroll = ft.ScrollMode.AUTO
-        page.controls.append(table)
-        page.update()
+        layout.addLayout(form_layout)
 
-    # function for deleting a book
-    def delete_book(e):
-        index = e.control.data
-        conn = sqlite3.connect('database.db')
-        c = conn.cursor()
-        c.execute("delete from books where id=?", (index,))
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(9)
+        self.table.setHorizontalHeaderLabels(
+            ['ID', 'Название', 'Автор', 'Жанр', 'Рейтинг', 'Статус', 'PDF файл', 'Открыть', 'Удалить'])
+        self.table.cellClicked.connect(self.cellClicked)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(self.table)
+
+        self.setLayout(layout)
+
+    def uploadPDF(self):
+        options = QFileDialog.Options()
+        file_path, _ = QFileDialog.getOpenFileName(self, "Загрузить PDF файл", "", "PDF Files (*.pdf)", options=options)
+        if file_path:
+            self.pdf_path_input.setText(file_path)
+
+    def loadBooks(self):
+        conn = sqlite3.connect('my_lib.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM books")
+        rows = cursor.fetchall()
+        conn.close()
+
+        self.table.setRowCount(len(rows))
+        for i, row in enumerate(rows):
+            for j, val in enumerate(row):
+                self.table.setItem(i, j, QTableWidgetItem(str(val)))
+            view_btn = QPushButton('Открыть')
+            view_btn.clicked.connect(self.viewBook)
+            self.table.setCellWidget(i, 7, view_btn)
+
+            delete_btn = QPushButton('Удалить')
+            delete_btn.clicked.connect(self.deleteBook)
+            self.table.setCellWidget(i, 8, delete_btn)
+
+    def addBook(self):
+        name = self.name_input.text()
+        author = self.author_input.text()
+        genre = self.genre_input.text()
+        rating = self.rating_input.text()
+        status = self.status_input.text()
+        pdf_path = self.pdf_path_input.text()
+
+        if not all([name, author, genre, rating, status, pdf_path]):
+            QMessageBox.warning(self, 'Ошибка', 'Заполните все поля!')
+            return
+
+        conn = sqlite3.connect('my_lib.db')
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO books (name, author, genre, rating, status, pdf_path) VALUES (?, ?, ?, ?, ?, ?)",
+                       (name, author, genre, rating, status, pdf_path))
         conn.commit()
-        view_books(e)
+        conn.close()
 
-    view_books_btn = ft.ElevatedButton(text="покажи книги", on_click=view_books)
+        QMessageBox.information(self, 'Успех', 'Книга добавлена!')
+        self.clearInputs()
+        self.loadBooks()
 
-    # add all elements to the page
-    page.add(txt_name_book,
-             txt_name_author,
-             txt_name_genre,
-             txt_rating,
-             txt_status,
-             output_text,
-             submit_btn,
-             view_books_btn)
+    def deleteBook(self):
+        button = self.sender()
+        index = self.table.indexAt(button.pos())
+        book_id = self.table.item(index.row(), 0).text()
 
-# run the application with the main function as the target
-ft.app(target=main)
-# below is a web-based version of the app
-# ft.app(target=main, view=ft.AppView.WEB_BROWSER)
+        conn = sqlite3.connect('my_lib.db')
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM books WHERE id=?", (book_id,))
+        conn.commit()
+        conn.close()
+
+        QMessageBox.information(self, 'Успех', 'Книга удалена!')
+        self.loadBooks()
+
+    def viewBook(self):
+        button = self.sender()
+        index = self.table.indexAt(button.pos())
+        pdf_path = self.table.item(index.row(), 6).text()
+
+        if pdf_path and os.path.exists(pdf_path):
+            try:
+                if sys.platform == 'win32':
+                    os.startfile(pdf_path)
+                elif sys.platform == 'darwin':
+                    subprocess.call(['open', pdf_path])
+                else:
+                    subprocess.call(['xdg-open', pdf_path])
+            except Exception as e:
+                QMessageBox.critical(self, 'Ошибка', f'Не удалось открыть PDF файл: {e}')
+        else:
+            QMessageBox.warning(self, 'Ошибка', 'Путь к PDF файлу не найден или файл не существует!')
+
+    def clearInputs(self):
+        self.name_input.clear()
+        self.author_input.clear()
+        self.genre_input.clear()
+        self.rating_input.clear()
+        self.status_input.clear()
+        self.pdf_path_input.clear()
+
+    def cellClicked(self, row, column):
+        # Do nothing for now
+        pass
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    ex = BookApp()
+    ex.show()
+    sys.exit(app.exec_())
