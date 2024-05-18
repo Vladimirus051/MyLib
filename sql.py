@@ -4,7 +4,7 @@ import sqlite3
 connection = sqlite3.connect('my_lib.db')
 cursor = connection.cursor()
 
-# Создаем таблицу books с колонкой для пути к PDF файлу
+# Обновляем таблицу books, добавляя новое поле comments
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS books (
     id INTEGER PRIMARY KEY,
@@ -13,9 +13,16 @@ CREATE TABLE IF NOT EXISTS books (
     genre TEXT NOT NULL,
     rating TEXT NOT NULL,
     status TEXT NOT NULL,
-    pdf_path TEXT
+    pdf_path TEXT,
+    comments TEXT
 )
 ''')
+
+# Проверяем, есть ли уже колонка comments, если нет - добавляем
+cursor.execute("PRAGMA table_info(books)")
+columns = [column[1] for column in cursor.fetchall()]
+if 'comments' not in columns:
+    cursor.execute("ALTER TABLE books ADD COLUMN comments TEXT")
 
 # Сохраняем изменения и закрываем соединение
 connection.commit()
