@@ -16,7 +16,7 @@ class BookApp(QWidget):
         self.loadBooks()
 
     def initUI(self):
-        self.setWindowTitle('Library App')
+        self.setWindowTitle('MyLib')
         self.setGeometry(100, 100, 1000, 700)
 
         self.setStyleSheet("""
